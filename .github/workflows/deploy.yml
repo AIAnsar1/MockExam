@@ -24,32 +24,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup kubectl
-        uses: azure/setup-kubectl@v3
-        with:
-          version: 'v1.28.0'
-
-      - name: Configure AWS credentials (if using EKS)
-        uses: aws-actions/configure-aws-credentials@v4
-        if: env.AWS_ACCESS_KEY_ID != ''
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
-
       - name: Deploy to staging
         run: |
-          # Replace image tag in deployment files
-          IMAGE_TAG="${{ github.event.workflow_run.head_sha }}"
-          sed -i "s|IMAGE_TAG|develop-${IMAGE_TAG}|g" k8s/staging/deployment.yaml
-          
-          # Apply Kubernetes manifests
-          kubectl apply -f k8s/staging/
-          
-          # Wait for deployment to complete
-          kubectl rollout status deployment/mockexam-app -n staging --timeout=300s
-          
-          echo "✅ Staging deployment completed"
+          echo "Deploying to staging environment..."
+          # Your staging deployment commands for Docker Compose or another service go here
+          echo "Staging deployment completed"
 
       - name: Run smoke tests
         run: |
@@ -74,32 +53,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup kubectl
-        uses: azure/setup-kubectl@v3
-        with:
-          version: 'v1.28.0'
-
-      - name: Configure AWS credentials (if using EKS)
-        uses: aws-actions/configure-aws-credentials@v4
-        if: env.AWS_ACCESS_KEY_ID != ''
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
-
       - name: Deploy to production
         run: |
-          # Replace image tag in deployment files
-          IMAGE_TAG="${{ github.event.workflow_run.head_sha }}"
-          sed -i "s|IMAGE_TAG|main-${IMAGE_TAG}|g" k8s/production/deployment.yaml
-          
-          # Apply Kubernetes manifests
-          kubectl apply -f k8s/production/
-          
-          # Wait for deployment to complete
-          kubectl rollout status deployment/mockexam-app -n production --timeout=600s
-          
-          echo "✅ Production deployment completed"
+          echo "Deploying to production environment..."
+          # Your production deployment commands for Docker Compose or another service go here
+          echo "Production deployment completed"
 
       - name: Run smoke tests
         run: |

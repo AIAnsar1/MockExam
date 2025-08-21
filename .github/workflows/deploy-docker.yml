@@ -1,0 +1,146 @@
+name: Docker Deploy
+
+on:
+  workflow_run:
+    workflows: ["Main CI/CD Pipeline"]
+    types:
+      - completed
+    branches: [main, develop]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}/laravel-app
+
+jobs:
+  deploy-staging:
+    name: Deploy to Staging Server
+    runs-on: ubuntu-latest
+    if: github.event.workflow_run.head_branch == 'develop' && github.event.workflow_run.conclusion == 'success'
+    environment: 
+      name: staging
+      url: ${{ vars.STAGING_URL }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.STAGING_SSH_KEY }}
+
+      - name: Deploy to staging server
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }} << 'EOF'
+            cd ${{ secrets.STAGING_PATH }}
+            
+            # Обновляем код
+            git pull origin develop
+            
+            # Логинимся в registry
+            echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            
+            # Обновляем образ в docker-compose
+            export IMAGE_TAG=develop-${{ github.event.workflow_run.head_sha }}
+            
+            # Останавливаем старые контейнеры
+            docker-compose -f docker-compose.staging.yml down
+            
+            # Запускаем новые контейнеры
+            docker-compose -f docker-compose.staging.yml pull
+            docker-compose -f docker-compose.staging.yml up -d
+            
+            # Запускаем миграции
+            docker-compose -f docker-compose.staging.yml exec -T app php artisan migrate --force
+            
+            # Очищаем кеш
+            docker-compose -f docker-compose.staging.yml exec -T app php artisan config:cache
+            docker-compose -f docker-compose.staging.yml exec -T app php artisan route:cache
+            docker-compose -f docker-compose.staging.yml exec -T app php artisan view:cache
+            
+            # Очищаем старые образы
+            docker image prune -f
+          EOF
+
+      - name: Health check
+        run: |
+          sleep 30
+          curl -f ${{ vars.STAGING_URL }}/health || exit 1
+          echo "✅ Staging deployment successful"
+
+  deploy-production:
+    name: Deploy to Production Server
+    runs-on: ubuntu-latest
+    if: github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.conclusion == 'success'
+    environment: 
+      name: production
+      url: ${{ vars.PRODUCTION_URL }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.PRODUCTION_SSH_KEY }}
+
+      - name: Deploy to production server
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.PRODUCTION_USER }}@${{ secrets.PRODUCTION_HOST }} << 'EOF'
+            cd ${{ secrets.PRODUCTION_PATH }}
+            
+            # Обновляем код
+            git pull origin main
+            
+            # Логинимся в registry
+            echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            
+            # Обновляем образ в docker-compose
+            export IMAGE_TAG=latest
+            
+            # Создаем бэкап базы данных
+            docker-compose -f docker-compose.prod.yml exec -T postgres pg_dump -U postgres laravel > backup_$(date +%Y%m%d_%H%M%S).sql
+            
+            # Останавливаем старые контейнеры (кроме базы данных)
+            docker-compose -f docker-compose.prod.yml stop app nginx redis
+            
+            # Обновляем образы
+            docker-compose -f docker-compose.prod.yml pull app
+            
+            # Запускаем новые контейнеры
+            docker-compose -f docker-compose.prod.yml up -d
+            
+            # Ждем запуска приложения
+            sleep 15
+            
+            # Запускаем миграции
+            docker-compose -f docker-compose.prod.yml exec -T app php artisan migrate --force
+            
+            # Очищаем и кешируем
+            docker-compose -f docker-compose.prod.yml exec -T app php artisan config:cache
+            docker-compose -f docker-compose.prod.yml exec -T app php artisan route:cache
+            docker-compose -f docker-compose.prod.yml exec -T app php artisan view:cache
+            docker-compose -f docker-compose.prod.yml exec -T app php artisan queue:restart
+            
+            # Очищаем старые образы
+            docker image prune -f
+          EOF
+
+      - name: Comprehensive health check
+        run: |
+          sleep 60
+          curl -f ${{ vars.PRODUCTION_URL }}/health || exit 1
+          curl -f ${{ vars.PRODUCTION_URL }}/api/health || exit 1
+          echo "✅ Production deployment successful"
+
+      - name: Create release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          draft: false
+          prerelease: false

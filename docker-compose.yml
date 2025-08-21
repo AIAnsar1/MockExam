@@ -3,9 +3,11 @@ version: '3.8'
 services:
   app:
     build:
-      context: .
+      context: ./vendor/laravel/sail/runtimes/8.3
       dockerfile: Dockerfile
-      target: development
+      args:
+        WWWGROUP: '${WWWGROUP}'
+    image: sail-8.3/app
     container_name: mockexam-app
     restart: unless-stopped
     working_dir: /var/www/html

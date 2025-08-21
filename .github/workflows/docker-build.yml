@@ -53,6 +53,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
+          dockerfile: ./docker/8.3/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
@@ -60,9 +61,10 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
-            APP_ENV=production
-            BUILD_NUMBER=${{ github.run_number }}
-            GIT_COMMIT=${{ github.sha }}
+            WWWGROUP=1000
+            NODE_VERSION=22
+            MYSQL_CLIENT=mysql-client
+            POSTGRES_VERSION=17
 
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
