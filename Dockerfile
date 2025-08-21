@@ -1,5 +1,5 @@
 # Multi-stage build for Laravel Octane with Swoole
-FROM php:8.2-cli-alpine AS base
+FROM php:8.3-cli-alpine AS base
 
 # Install system dependencies
 RUN apk add --no-cache \
@@ -16,7 +16,12 @@ RUN apk add --no-cache \
     libjpeg-turbo-dev \
     libwebp-dev \
     supervisor \
-    nginx
+    nginx \
+  && apk add --no-cache --virtual .build-deps \
+    $PHPIZE_DEPS \
+    zlib-dev \
+    build-base \
+    linux-headers
 
 # Install PHP extensions
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp \
@@ -36,6 +41,9 @@ RUN pecl install redis && docker-php-ext-enable redis
 
 # Install Swoole extension
 RUN pecl install swoole && docker-php-ext-enable swoole
+
+# Cleanup build dependencies
+RUN apk del .build-deps
 
 # Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
