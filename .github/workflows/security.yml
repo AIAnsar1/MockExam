@@ -30,7 +30,7 @@ jobs:
         continue-on-error: true
 
       - name: Upload Composer Audit Results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: composer-audit-results
           path: composer-audit.json
@@ -53,7 +53,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v2
+        uses: github/codeql-action/init@v3
         with:
           languages: ${{ matrix.language }}
 
@@ -61,7 +61,7 @@ jobs:
         if: matrix.language == 'php'
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.2'
+          php-version: '8.3'
 
       - name: Install Composer dependencies
         if: matrix.language == 'php'
@@ -78,7 +78,7 @@ jobs:
         run: npm ci
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v2
+        uses: github/codeql-action/analyze@v3
 
   secret-scanning:
     name: Secret Scanning
@@ -94,6 +94,4 @@ jobs:
         uses: trufflesecurity/trufflehog@main
         with:
           path: ./
-          base: main
-          head: HEAD
           extra_args: --debug --only-verified
