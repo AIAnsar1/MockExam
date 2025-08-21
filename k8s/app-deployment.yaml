@@ -1,0 +1,96 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mockexam-app-deployment
+  namespace: mockexam
+  labels:
+    app: mockexam-app
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: mockexam-app
+  template:
+    metadata:
+      labels:
+        app: mockexam-app
+    spec:
+      initContainers:
+      - name: migration
+        image: mockexam:latest
+        command: ['php', 'artisan', 'migrate', '--force']
+        envFrom:
+        - configMapRef:
+            name: mockexam-config
+        - secretRef:
+            name: mockexam-secrets
+      containers:
+      - name: mockexam-app
+        image: mockexam:latest
+        ports:
+        - containerPort: 8000
+        - containerPort: 80
+        envFrom:
+        - configMapRef:
+            name: mockexam-config
+        - secretRef:
+            name: mockexam-secrets
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /api/health
+            port: 8000
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /api/health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        volumeMounts:
+        - name: storage-volume
+          mountPath: /var/www/html/storage/app
+      volumes:
+      - name: storage-volume
+        persistentVolumeClaim:
+          claimName: app-storage-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mockexam-app-service
+  namespace: mockexam
+spec:
+  selector:
+    app: mockexam-app
+  ports:
+  - name: http
+    port: 80
+    targetPort: 80
+  - name: octane
+    port: 8000
+    targetPort: 8000
+  type: ClusterIP
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: app-storage-pvc
+  namespace: mockexam
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 5Gi
