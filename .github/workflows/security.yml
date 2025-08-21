@@ -6,7 +6,7 @@ on:
   pull_request:
     branches: [ main ]
   schedule:
-    - cron: '0 2 * * 1' # Weekly on Monday at 2 AM
+    - cron: '0 2 * * 1' # Еженедельно по понедельникам в 2:00
 
 jobs:
   dependency-check:
@@ -21,6 +21,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.3'
+          tools: composer:v2
 
       - name: Install Composer dependencies
         run: composer install --no-interaction --prefer-dist --optimize-autoloader
@@ -52,15 +53,11 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
         with:
           languages: ${{ matrix.language }}
-          config-file: .github/codeql/codeql-config.yml
-          queries: security-and-quality
 
       - name: Setup PHP
         if: matrix.language == 'php'
@@ -68,26 +65,21 @@ jobs:
         with:
           php-version: '8.3'
           tools: composer:v2
-          coverage: none
 
       - name: Install Composer dependencies
         if: matrix.language == 'php'
-        run: |
-          composer config --no-plugins allow-plugins.symfony/runtime true
-          composer install --no-interaction --prefer-dist --optimize-autoloader --no-progress --no-scripts
+        run: composer install --no-interaction --prefer-dist --optimize-autoloader
 
       - name: Setup Node.js
         if: matrix.language == 'javascript'
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '22'
           cache: 'npm'
 
       - name: Install NPM dependencies
         if: matrix.language == 'javascript'
-        run: |
-          npm ci --no-audit --prefer-offline
-          npm cache clean --force
+        run: npm ci
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4
@@ -116,3 +108,28 @@ jobs:
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: trufflehog.sarif
+
+  docker-security:
+    name: Docker Security Scan
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build Docker image for scanning
+        run: |
+          docker build -f docker/8.3/Dockerfile -t security-scan:latest .
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'security-scan:latest'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-results.sarif'

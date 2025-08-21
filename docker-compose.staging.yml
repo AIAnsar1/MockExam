@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   app:
-    image: ${REGISTRY:-ghcr.io}/${IMAGE_NAME:-your-repo/laravel-app}:${IMAGE_TAG:-develop-latest}
+    image: ${REGISTRY:-ghcr.io}/${IMAGE_NAME}:${IMAGE_TAG:-develop-latest}
     container_name: laravel_app_staging
     restart: unless-stopped
     working_dir: /var/www/html
@@ -74,7 +74,7 @@ services:
       - "6379:6379"
 
   horizon:
-    image: ${REGISTRY:-ghcr.io}/${IMAGE_NAME:-your-repo/laravel-app}:${IMAGE_TAG:-develop-latest}
+    image: ${REGISTRY:-ghcr.io}/${IMAGE_NAME}:${IMAGE_TAG:-develop-latest}
     container_name: horizon_staging
     restart: unless-stopped
     working_dir: /var/www/html
