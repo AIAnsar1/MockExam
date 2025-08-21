@@ -25,7 +25,6 @@ jobs:
           --health-retries 5
         ports:
           - 5432:5432
-          
       redis:
         image: redis:7-alpine
         options: >-
@@ -37,17 +36,14 @@ jobs:
           - 6379:6379
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+      - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.3'
           extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, sqlite, pdo_sqlite, bcmath, soap, intl, gd, exif, iconv, imagick, fileinfo, pgsql, pdo_pgsql, redis
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '18'
 
@@ -75,15 +71,22 @@ jobs:
       - name: Start Laravel Octane server
         run: |
           php artisan octane:start --server=swoole --host=0.0.0.0 --port=8000 &
-          sleep 10
-        
+          for i in {1..30}; do
+            if curl -s http://127.0.0.1:8000 > /dev/null; then
+              echo "Server is up!"
+              break
+            fi
+            echo "Waiting for server..."
+            sleep 2
+          done
+
       - name: Run Lighthouse CI
         uses: treosh/lighthouse-ci-action@v10
         with:
           urls: |
-            http://localhost:8000
-            http://localhost:8000/api/courses
-            http://localhost:8000/api/exams
+            http://127.0.0.1:8000
+            http://127.0.0.1:8000/api/courses
+            http://127.0.0.1:8000/api/exams
           uploadArtifacts: true
           temporaryPublicStorage: true
 
@@ -105,7 +108,6 @@ jobs:
           --health-retries 5
         ports:
           - 5432:5432
-          
       redis:
         image: redis:7-alpine
         options: >-
@@ -117,18 +119,15 @@ jobs:
           - 6379:6379
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+      - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.3'
           extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, sqlite, pdo_sqlite, bcmath, soap, intl, gd, exif, iconv, imagick, fileinfo, pgsql, pdo_pgsql, redis
 
       - name: Install dependencies
-        run: |
-          composer install --no-interaction --prefer-dist --optimize-autoloader
+        run: composer install --no-interaction --prefer-dist --optimize-autoloader
 
       - name: Setup environment
         run: |
@@ -148,14 +147,19 @@ jobs:
       - name: Start Laravel Octane server
         run: |
           php artisan octane:start --server=swoole --host=0.0.0.0 --port=8000 &
-          sleep 10
+          for i in {1..30}; do
+            if curl -s http://127.0.0.1:8000 > /dev/null; then
+              echo "Server is up!"
+              break
+            fi
+            echo "Waiting for server..."
+            sleep 2
+          done
 
       - name: Run K6 Load Test
-        uses: grafana/k6-action@v0.3.1
-        with:
-          filename: tests/performance/load-test.js
+        run: k6 run --vus 10 --duration 30s --out json=k6-results.json tests/performance/load-test.js
         env:
-          BASE_URL: http://localhost:8000
+          BASE_URL: http://127.0.0.1:8000
 
       - name: Upload K6 results
         uses: actions/upload-artifact@v4
