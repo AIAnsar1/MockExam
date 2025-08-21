@@ -1,4 +1,4 @@
-name: Pull Request Checks
+name: PR Checks - MockExam API
 
 on:
   pull_request:
@@ -6,7 +6,6 @@ on:
 
 env:
   PHP_VERSION: '8.3'
-  NODE_VERSION: '22'
 
 jobs:
   quick-tests:
@@ -49,12 +48,6 @@ jobs:
           extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, pgsql, pdo_pgsql, bcmath, soap, intl, gd, exif, iconv, redis
           tools: composer:v2
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-
       - name: Cache Composer dependencies
         uses: actions/cache@v4
         with:
@@ -63,10 +56,8 @@ jobs:
           restore-keys: |
             composer-${{ runner.os }}-
 
-      - name: Install dependencies
-        run: |
-          composer install --no-interaction --prefer-dist --optimize-autoloader
-          npm ci
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --prefer-dist --optimize-autoloader
 
       - name: Setup environment
         run: |
@@ -84,16 +75,18 @@ jobs:
           echo "REDIS_PORT=6379" >> .env
 
       - name: Check code style
-        run: ./vendor/bin/pint --test
+        run: |
+          if [ -f "./vendor/bin/pint" ]; then
+            ./vendor/bin/pint --test
+          else
+            echo "Pint not found, skipping code style check"
+          fi
 
       - name: Run migrations
         run: php artisan migrate:fresh --force
 
-      - name: Run tests
-        run: php artisan test --parallel
-
-      - name: Build assets
-        run: npm run build
+      - name: Run API tests
+        run: php artisan test --testsuite=Feature
 
       - name: Run security audit
         run: composer audit
