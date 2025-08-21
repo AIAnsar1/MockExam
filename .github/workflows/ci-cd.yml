@@ -7,7 +7,7 @@ on:
     branches: [ main, develop ]
 
 env:
-  PHP_VERSION: '8.2'
+  PHP_VERSION: '8.3'
   NODE_VERSION: '18'
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}/mockexam-laravel-octane
@@ -110,14 +110,14 @@ jobs:
           ./vendor/bin/phpunit --coverage-clover tests/results/coverage.xml --log-junit tests/results/phpunit.xml
 
       - name: Upload test results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: always()
         with:
           name: test-results
           path: tests/results/
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v4
         with:
           file: tests/results/coverage.xml
           fail_ci_if_error: false
