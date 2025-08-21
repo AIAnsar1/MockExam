@@ -34,6 +34,7 @@ jobs:
         with:
           name: composer-audit-results
           path: composer-audit.json
+          retention-days: 7
 
   code-scanning:
     name: CodeQL Analysis
@@ -51,38 +52,54 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v4
+        uses: github/codeql-action/init@v3
         with:
           languages: ${{ matrix.language }}
+          config-file: .github/codeql/codeql-config.yml
+          queries: security-and-quality
 
       - name: Setup PHP
         if: matrix.language == 'php'
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.3'
+          tools: composer:v2
+          coverage: none
 
       - name: Install Composer dependencies
         if: matrix.language == 'php'
-        run: composer install --no-interaction --prefer-dist --optimize-autoloader
+        run: |
+          composer config --no-plugins allow-plugins.symfony/runtime true
+          composer install --no-interaction --prefer-dist --optimize-autoloader --no-progress --no-scripts
 
       - name: Setup Node.js
         if: matrix.language == 'javascript'
         uses: actions/setup-node@v4
         with:
           node-version: '18'
+          cache: 'npm'
 
       - name: Install NPM dependencies
         if: matrix.language == 'javascript'
-        run: npm ci
+        run: |
+          npm ci --no-audit --prefer-offline
+          npm cache clean --force
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v4
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"
 
   secret-scanning:
     name: Secret Scanning
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
     
     steps:
       - name: Checkout code
@@ -94,4 +111,16 @@ jobs:
         uses: trufflesecurity/trufflehog@main
         with:
           path: ./
-          extra_args: --debug --only-verified
+          extra_args: >
+            --only-verified
+            --fail
+            --no-update
+            --config .trufflehog.yaml
+            --json
+            --exclude-paths .git,node_modules,vendor,tests/_output,storage/logs
+          
+      - name: Upload results to GitHub Security tab
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trufflehog-results.sarif
