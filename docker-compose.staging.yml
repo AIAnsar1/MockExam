@@ -2,17 +2,18 @@ version: '3.8'
 
 services:
   app:
-    image: ${REGISTRY:-ghcr.io}/${IMAGE_NAME}:${IMAGE_TAG:-develop-latest}
-    container_name: mockexam_app_staging
+    image: ${REGISTRY:-ghcr.io}/${IMAGE_NAME:-laravel-octane-api}:${IMAGE_TAG:-develop-latest}
+    container_name: laravel_api_staging
     restart: unless-stopped
     working_dir: /var/www/html
     environment:
       - APP_ENV=staging
-      - APP_DEBUG=false
+      - APP_DEBUG=true
+      - APP_KEY=${APP_KEY}
       - DB_CONNECTION=pgsql
       - DB_HOST=postgres
       - DB_PORT=5432
-      - DB_DATABASE=${DB_DATABASE:-mockexam_staging}
+      - DB_DATABASE=${DB_DATABASE:-laravel_staging}
       - DB_USERNAME=${DB_USERNAME:-postgres}
       - DB_PASSWORD=${DB_PASSWORD}
       - REDIS_HOST=redis
@@ -20,11 +21,14 @@ services:
       - CACHE_DRIVER=redis
       - SESSION_DRIVER=redis
       - QUEUE_CONNECTION=redis
+      - OCTANE_SERVER=roadrunner
+      - OCTANE_HOST=0.0.0.0
+      - OCTANE_PORT=8000
     volumes:
       - ./storage:/var/www/html/storage
       - ./bootstrap/cache:/var/www/html/bootstrap/cache
     networks:
-      - mockexam_staging
+      - laravel_staging
     depends_on:
       - postgres
       - redis
@@ -32,36 +36,61 @@ services:
       - "8000:8000"
 
   postgres:
-    image: postgres:15-alpine
-    container_name: mockexam_postgres_staging
+    image: postgres:17-alpine
+    container_name: postgres_staging
     restart: unless-stopped
     environment:
-      - POSTGRES_DB=${DB_DATABASE:-mockexam_staging}
+      - POSTGRES_DB=${DB_DATABASE:-laravel_staging}
       - POSTGRES_USER=${DB_USERNAME:-postgres}
       - POSTGRES_PASSWORD=${DB_PASSWORD}
     volumes:
       - postgres_staging_data:/var/lib/postgresql/data
     networks:
-      - mockexam_staging
+      - laravel_staging
     ports:
       - "5432:5432"
 
   redis:
     image: redis:7-alpine
-    container_name: mockexam_redis_staging
+    container_name: redis_staging
     restart: unless-stopped
-    command: redis-server --appendonly yes --requirepass ""
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
     volumes:
       - redis_staging_data:/data
     networks:
-      - mockexam_staging
+      - laravel_staging
     ports:
       - "6379:6379"
+
+  horizon:
+    image: ${REGISTRY:-ghcr.io}/${IMAGE_NAME}:${IMAGE_TAG:-develop-latest}
+    container_name: horizon_staging
+    restart: unless-stopped
+    working_dir: /var/www/html
+    command: php artisan horizon
+    environment:
+      - APP_ENV=staging
+      - DB_CONNECTION=pgsql
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_DATABASE=${DB_DATABASE:-laravel_staging}
+      - DB_USERNAME=${DB_USERNAME:-postgres}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - QUEUE_CONNECTION=redis
+    volumes:
+      - ./storage:/var/www/html/storage
+    networks:
+      - laravel_staging
+    depends_on:
+      - postgres
+      - redis
 
 volumes:
   postgres_staging_data:
   redis_staging_data:
 
 networks:
-  mockexam_staging:
+  laravel_staging:
     driver: bridge

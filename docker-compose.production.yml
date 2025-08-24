@@ -2,18 +2,19 @@ version: '3.8'
 
 services:
   app:
-    image: ghcr.io/${GITHUB_REPOSITORY}/mockexam-laravel-octane:latest
-    container_name: mockexam_app
+    image: ${REGISTRY:-ghcr.io}/${IMAGE_NAME}:${IMAGE_TAG:-latest}
+    container_name: laravel_app_prod
     restart: unless-stopped
     working_dir: /var/www/html
     environment:
       - APP_ENV=production
       - APP_DEBUG=false
+      - APP_KEY=${APP_KEY}
       - DB_CONNECTION=pgsql
       - DB_HOST=postgres
       - DB_PORT=5432
-      - DB_DATABASE=${DB_DATABASE}
-      - DB_USERNAME=${DB_USERNAME}
+      - DB_DATABASE=${DB_DATABASE:-laravel_production}
+      - DB_USERNAME=${DB_USERNAME:-postgres}
       - DB_PASSWORD=${DB_PASSWORD}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
@@ -25,10 +26,16 @@ services:
       - ./storage:/var/www/html/storage
       - ./bootstrap/cache:/var/www/html/bootstrap/cache
     networks:
-      - mockexam_network
+      - laravel_production
     depends_on:
       - postgres
       - redis
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
 
   nginx:
     image: nginx:alpine
