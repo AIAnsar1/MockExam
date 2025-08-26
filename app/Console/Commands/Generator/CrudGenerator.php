@@ -4,6 +4,7 @@ namespace App\Console\Commands\Generator;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Artisan;
+use Symfony\Component\Console\Output\OutputInterface;
 
 class CrudGenerator extends Command
 {
@@ -70,6 +71,12 @@ class CrudGenerator extends Command
             }
         }
         Artisan::call('make:migration create_' . strtolower($this->argument('name')) . 's_table');
-        $this->info("[ ETA ]: Service Created Success Fully! ");
+        Artisan::call('make:filament-resource', [
+            'model' => $this->argument('name'),
+            '--record-title-attribute' => 'name',
+            '--no-interaction' => true,
+            '--generate' => true,
+        ], $this->getOutput());
+        $this->info("[ ETA ]: Created Success Fully!");
     }
 }

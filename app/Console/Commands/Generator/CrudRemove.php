@@ -50,43 +50,59 @@ class CrudRemove extends Command
         $httpMethods = ['get', 'post', 'get', 'put', 'delete'];
         $pathX = $this->argument('name');
 
-        foreach ($this->fileNames as $fileName)
-        {
-            echo "[ ETA ]: " . str_replace('CrudGeneratpr', $this->argument('name'), $fileName). ".php" . PHP_EOL;
-            @unlink(str_replace('CrudGenerator', $this->argument('name'), $fileName) . ".php");
+        foreach ($this->fileNames as $fileName) {
+            $filePath = str_replace('CrudGenerator', $pathX, $fileName) . ".php";
 
-            foreach ($testMethods as $index => $methods)
+            if (file_exists($filePath)) 
             {
-                $testFileNames = "tests/Features/{$pathX}/{$httpMethods[$index]}{$pathX}{$testMethods[$index]}RequestTest.php";
+                @unlink($filePath);
+                $this->info("[ ETA ]: Removed $filePath");
+            }
 
-                if (file_exists($testFileNames))
+            foreach ($testMethods as $index => $methods) 
+            {
+                $testFileName = "tests/Feature/{$pathX}/" . ucfirst($httpMethods[$index]) . "{$pathX}{$methods}RequestTest.php";
+                if (file_exists($testFileName)) 
                 {
-                    @unlink($testFileNames);
+                    @unlink($testFileName);
+                    $this->info("[ ETA ]: Removed $testFileName");
                 }
             }
         }
         $this->deleteDirectory("tests/Feature/{$pathX}");
-        die();
-    }
+        $filamentResourceDir = app_path("Filament/Resources/{$pathX}s");
+        if (is_dir($filamentResourceDir))
+        {
+            $this->deleteDirectory($filamentResourceDir);
+            $this->info("[ ETA ]: Removed Filament Resource directory {$filamentResourceDir}");
+        }
 
+        foreach (glob(database_path("migrations/*_create_" . strtolower($pathX) . "s_table.php")) as $migrationFile)
+        {
+            @unlink($migrationFile);
+            $this->info("[ ETA ]: Removed Migration " . basename($migrationFile));
+        }
+        $this->info("[ ETA ]: CRUD for {$pathX} removed successfully!");
+    }
 
     private function deleteDirectory($dir)
     {
-        if (!file_exists($dir)) {
+        if (!file_exists($dir)) 
+        {
             return;
         }
-
         $files = array_diff(scandir($dir), ['.', '..']);
 
-        foreach ($files as $file) {
+        foreach ($files as $file) 
+        {
             $path = "$dir/$file";
-            if (is_dir($path)) {
+            if (is_dir($path)) 
+            {
                 $this->deleteDirectory($path);
             } else {
                 @unlink($path);
             }
         }
-
         rmdir($dir);
     }
 }
